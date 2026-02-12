@@ -50,6 +50,66 @@ pipeline {
             }
         }
         
+        stage('Setup Dependencies') {
+            steps {
+                script {
+                    sh '''
+                        echo "Installing required dependencies..."
+                        
+                        # Check if running as root or with sudo access
+                        if [ "$(id -u)" = "0" ]; then
+                            # Running as root
+                            SUDO=""
+                        else
+                            # Check if sudo is available
+                            if command -v sudo >/dev/null 2>&1; then
+                                SUDO="sudo"
+                            else
+                                echo "Warning: No sudo access available"
+                                SUDO=""
+                            fi
+                        fi
+                        
+                        # Install Docker if not present
+                        if ! command -v docker &> /dev/null; then
+                            echo "Installing Docker..."
+                            $SUDO apt-get update || yum update -y || true
+                            $SUDO apt-get install -y curl || yum install -y curl || true
+                            curl -fsSL https://get.docker.com -o get-docker.sh
+                            $SUDO sh get-docker.sh || true
+                            $SUDO usermod -aG docker jenkins || true
+                        else
+                            echo "Docker is already installed"
+                        fi
+                        
+                        # Install sshpass if not present
+                        if ! command -v sshpass &> /dev/null; then
+                            echo "Installing sshpass..."
+                            $SUDO apt-get update || yum update -y || true
+                            $SUDO apt-get install -y sshpass || yum install -y sshpass || true
+                        else
+                            echo "sshpass is already installed"
+                        fi
+                        
+                        # Install docker-compose if not present
+                        if ! command -v docker-compose &> /dev/null; then
+                            echo "Installing docker-compose..."
+                            $SUDO curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose || true
+                            $SUDO chmod +x /usr/local/bin/docker-compose || true
+                        else
+                            echo "docker-compose is already installed"
+                        fi
+                        
+                        # Verify installations
+                        echo "Checking installed versions:"
+                        docker --version || echo "Docker not available"
+                        docker-compose --version || echo "Docker Compose not available"
+                        sshpass -V || echo "sshpass not available"
+                    '''
+                }
+            }
+        }
+        
         stage('Environment Setup') {
             steps {
                 script {
@@ -89,8 +149,25 @@ ADMIN_EMAIL=admin@impact-lms.com
                             script {
                                 sh '''
                                     echo "Building Backend Docker Image..."
-                                    docker build -t ${APP_NAME}-backend:${IMAGE_TAG} .
-                                    docker tag ${APP_NAME}-backend:${IMAGE_TAG} ${APP_NAME}-backend:latest
+                                    
+                                    # Check if Docker is available
+                                    if ! command -v docker &> /dev/null; then
+                                        echo "ERROR: Docker is not available. Trying to restart Docker service..."
+                                        sudo systemctl start docker || service docker start || true
+                                        sleep 10
+                                    fi
+                                    
+                                    # Try building with different approaches
+                                    if command -v docker &> /dev/null; then
+                                        docker build -t ${APP_NAME}-backend:${IMAGE_TAG} . || {
+                                            echo "Docker build failed, trying with sudo..."
+                                            sudo docker build -t ${APP_NAME}-backend:${IMAGE_TAG} .
+                                        }
+                                        docker tag ${APP_NAME}-backend:${IMAGE_TAG} ${APP_NAME}-backend:latest || sudo docker tag ${APP_NAME}-backend:${IMAGE_TAG} ${APP_NAME}-backend:latest
+                                    else
+                                        echo "ERROR: Docker is still not available after installation attempts"
+                                        exit 1
+                                    fi
                                 '''
                             }
                         }
@@ -103,9 +180,26 @@ ADMIN_EMAIL=admin@impact-lms.com
                             script {
                                 sh '''
                                     echo "Building Frontend Docker Image..."
-                                    # Use production Dockerfile
-                                    docker build -f Dockerfile -t ${APP_NAME}-frontend:${IMAGE_TAG} .
-                                    docker tag ${APP_NAME}-frontend:${IMAGE_TAG} ${APP_NAME}-frontend:latest
+                                    
+                                    # Check if Docker is available
+                                    if ! command -v docker &> /dev/null; then
+                                        echo "ERROR: Docker is not available. Trying to restart Docker service..."
+                                        sudo systemctl start docker || service docker start || true
+                                        sleep 10
+                                    fi
+                                    
+                                    # Try building with different approaches
+                                    if command -v docker &> /dev/null; then
+                                        # Use production Dockerfile
+                                        docker build -f Dockerfile -t ${APP_NAME}-frontend:${IMAGE_TAG} . || {
+                                            echo "Docker build failed, trying with sudo..."
+                                            sudo docker build -f Dockerfile -t ${APP_NAME}-frontend:${IMAGE_TAG} .
+                                        }
+                                        docker tag ${APP_NAME}-frontend:${IMAGE_TAG} ${APP_NAME}-frontend:latest || sudo docker tag ${APP_NAME}-frontend:${IMAGE_TAG} ${APP_NAME}-frontend:latest
+                                    else
+                                        echo "ERROR: Docker is still not available after installation attempts"
+                                        exit 1
+                                    fi
                                 '''
                             }
                         }
@@ -312,12 +406,16 @@ ENDSSH
             script {
                 sh '''
                     # Clean up local Docker images to save space
-                    docker image prune -f
+                    if command -v docker &> /dev/null; then
+                        docker image prune -f || sudo docker image prune -f || echo "Docker cleanup failed"
+                    else
+                        echo "Docker not available for cleanup"
+                    fi
                     
                     # Remove deployment files
-                    rm -rf deploy/
-                    rm -f deployment-*.tar.gz
-                    rm -f .env.prod
+                    rm -rf deploy/ || true
+                    rm -f deployment-*.tar.gz || true
+                    rm -f .env.prod || true
                 '''
             }
         }
@@ -335,17 +433,24 @@ ENDSSH
             script {
                 sh '''
                     echo "Attempting rollback..."
-                    sshpass -p "${SERVER_PASSWORD}" ssh -o StrictHostKeyChecking=no \
-                        ${SERVER_USER}@${SERVER_HOST} << 'ENDSSH'
                     
-                    cd ${DEPLOY_PATH}
-                    # Restore previous version if backup exists
-                    if [ -f docker-compose.backup.yml ]; then
-                        echo "Rolling back to previous version..."
-                        mv docker-compose.backup.yml docker-compose.prod.yml
-                        docker-compose -f docker-compose.prod.yml up -d
-                    fi
+                    # Check if sshpass is available
+                    if command -v sshpass &> /dev/null; then
+                        sshpass -p "${SERVER_PASSWORD}" ssh -o StrictHostKeyChecking=no \
+                            ${SERVER_USER}@${SERVER_HOST} << 'ENDSSH'
+                        
+                        cd ${DEPLOY_PATH}
+                        # Restore previous version if backup exists
+                        if [ -f docker-compose.backup.yml ]; then
+                            echo "Rolling back to previous version..."
+                            mv docker-compose.backup.yml docker-compose.prod.yml
+                            docker-compose -f docker-compose.prod.yml up -d
+                        fi
 ENDSSH
+                    else
+                        echo "sshpass not available, cannot perform automatic rollback"
+                        echo "Manual rollback may be required on server ${SERVER_HOST}"
+                    fi
                 '''
             }
         }
