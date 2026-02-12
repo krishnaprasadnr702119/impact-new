@@ -1,40 +1,49 @@
 #!/bin/bash
 
 # Quick Jenkins Setup Script for Impact LMS Deployment
+# Repository: https://github.com/krishnaprasadnr702119/impact-new.git
+# Local Jenkins Server Configuration
 
 echo "=== Jenkins Setup for Impact LMS Deployment ==="
 echo ""
 
-echo "1. JENKINS CREDENTIALS SETUP"
-echo "   Go to Jenkins → Manage Jenkins → Manage Credentials"
-echo "   Add the following credential:"
-echo ""
-echo "   Type: Secret text"
-echo "   ID: server-ssh-password"
-echo "   Secret: CStp4DR@2025#"
-echo "   Description: SSH password for deployment server (82.25.109.1)"
+echo "📍 REPOSITORY INFORMATION"
+echo "   GitHub Repository: https://github.com/krishnaprasadnr702119/impact-new.git"
+echo "   Target Server: 82.25.109.1"
+echo "   Jenkins: Local Server"
 echo ""
 
-echo "2. JENKINS PIPELINE JOB SETUP"
+echo "1. JENKINS JOB SETUP (Local Jenkins)"
+echo "   - Open your local Jenkins: http://localhost:8080"
 echo "   - Create new Pipeline job named 'impact-lms-deployment'"
-echo "   - Set Pipeline definition to 'Pipeline script from SCM'"
-echo "   - Configure your Git repository URL"
-echo "   - Set Script Path to 'Jenkinsfile'"
+echo "   - Pipeline Configuration:"
+echo "     • Definition: Pipeline script from SCM"
+echo "     • SCM: Git"
+echo "     • Repository URL: https://github.com/krishnaprasadnr702119/impact-new.git"
+echo "     • Credentials: Add GitHub credentials if private repo"
+echo "     • Branch: */main (or your default branch)"
+echo "     • Script Path: Jenkinsfile"
+echo ""
+
+echo "2. NO CREDENTIALS NEEDED (Password in Pipeline)"
+echo "   ✅ Server password (CStp4DR@2025#) is configured in pipeline"
+echo "   ✅ No additional Jenkins credentials required"
+echo "   ⚠️  Consider using Jenkins credentials for better security"
 echo ""
 
 echo "3. REQUIRED JENKINS PLUGINS"
-echo "   Install these plugins if not already installed:"
+echo "   Install these plugins in your local Jenkins:"
 echo "   - Pipeline"
 echo "   - Git"
 echo "   - Docker Pipeline"
-echo "   - SSH Agent"
-echo "   - Credentials Binding"
+echo "   - GitHub Integration"
 echo ""
 
-echo "4. JENKINS SYSTEM REQUIREMENTS"
-echo "   - Docker installed on Jenkins server"
-echo "   - Network access to deployment server (82.25.109.1)"
-echo "   - Sufficient disk space for Docker images"
+echo "4. LOCAL JENKINS REQUIREMENTS"
+echo "   ✅ Docker installed on Jenkins server"
+echo "   ✅ Network access to deployment server (82.25.109.1)"
+echo "   ✅ Sufficient disk space for Docker images"
+echo "   ✅ sshpass package (will be auto-installed)"
 echo ""
 
 echo "5. DEPLOYMENT FLOW"

@@ -1,48 +1,53 @@
-# Jenkins Pipeline Setup Guide
+# Jenkins Pipeline Setup Guide - Impact LMS
+
+## Repository Configuration
+- **GitHub Repository:** https://github.com/krishnaprasadnr702119/impact-new.git
+- **Target Server:** 82.25.109.1
+- **Jenkins Location:** Local Server
 
 ## Prerequisites
 
-1. **Jenkins Server** with the following plugins installed:
+1. **Local Jenkins Server** with the following plugins installed:
    - Pipeline
    - Git
    - Docker Pipeline
-   - SSH Agent
-   - Credentials Binding
+   - GitHub Integration
 
 2. **Docker** installed on Jenkins server
 
-3. **Server Access** to target deployment server (82.25.109.1)
+3. **Network Access** to target deployment server (82.25.109.1)
 
 ## Jenkins Configuration
 
-### 1. Create Credentials
-
-Go to Jenkins → Manage Jenkins → Manage Credentials → Global → Add Credentials
-
-#### Server SSH Password
-- **Kind:** Secret text
-- **ID:** `server-ssh-password`
-- **Secret:** `CStp4DR@2025#`
-- **Description:** SSH password for deployment server
+### 1. Access Your Local Jenkins
+- Open: http://localhost:8080
+- Login with your Jenkins admin credentials
 
 ### 2. Create Pipeline Job
 
 1. Go to Jenkins → New Item → Pipeline
 2. Name: `impact-lms-deployment`
-3. Configure:
+3. Configure Pipeline:
    - **Pipeline Definition:** Pipeline script from SCM
    - **SCM:** Git
-   - **Repository URL:** Your Git repository URL
+   - **Repository URL:** `https://github.com/krishnaprasadnr702119/impact-new.git`
+   - **Branch Specifier:** `*/main` (or your default branch)
    - **Script Path:** `Jenkinsfile`
 
-### 3. Environment Setup
+### 3. GitHub Integration (Optional)
 
-The pipeline will automatically:
-- Install Docker and Docker Compose on the target server
-- Build application images
-- Deploy using production configuration
-- Run health checks
-- Handle rollbacks on failure
+For automatic builds on push:
+1. Install GitHub plugin in Jenkins
+2. Configure GitHub webhook:
+   - Go to GitHub repository settings
+   - Add webhook: `http://your-jenkins-server:8080/github-webhook/`
+   - Select "Just the push event"
+
+### 4. No Credentials Required
+The pipeline is configured with the server password directly. For better security, consider:
+- Using Jenkins credentials store
+- SSH key authentication
+- Environment variable configuration
 
 ## Pipeline Features
 

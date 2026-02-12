@@ -1,7 +1,22 @@
 pipeline {
     agent any
     
+    // GitHub Repository Configuration
+    options {
+        gitLabConnection('github')
+        buildDiscarder(logRotator(numToKeepStr: '10'))
+        timeout(time: 30, unit: 'MINUTES')
+    }
+    
+    // Trigger on GitHub push (configure webhook in GitHub)
+    triggers {
+        githubPush()
+    }
+    
     environment {
+        // GitHub Repository
+        GIT_REPO = 'https://github.com/krishnaprasadnr702119/impact-new.git'
+        
         // Docker Registry Configuration
         DOCKER_REGISTRY = 'docker.io'
         IMAGE_TAG = "${BUILD_NUMBER}"
@@ -12,15 +27,11 @@ pipeline {
         // Server Configuration
         SERVER_HOST = '82.25.109.1'
         SERVER_USER = 'root'
+        SERVER_PASSWORD = 'CStp4DR@2025#'
         DEPLOY_PATH = '/opt/impact-lms'
         
         // Docker Compose Configuration
         COMPOSE_FILE = 'docker-compose.prod.yml'
-    }
-    
-    options {
-        buildDiscarder(logRotator(numToKeepStr: '10'))
-        timeout(time: 30, unit: 'MINUTES')
     }
     
     stages {
@@ -223,56 +234,52 @@ EOF
         
         stage('Deploy to Server') {
             steps {
-                withCredentials([
-                    string(credentialsId: 'server-ssh-password', variable: 'SSH_PASSWORD')
-                ]) {
-                    script {
-                        sh '''
-                            echo "Deploying to production server..."
-                            
-                            # Install sshpass if not available
-                            which sshpass || (apt-get update && apt-get install -y sshpass)
-                            
-                            # Copy deployment package to server
-                            sshpass -p "${SSH_PASSWORD}" scp -o StrictHostKeyChecking=no \
-                                deployment-${BUILD_NUMBER}.tar.gz ${SERVER_USER}@${SERVER_HOST}:/tmp/
-                            
-                            # Execute deployment on server
-                            sshpass -p "${SSH_PASSWORD}" ssh -o StrictHostKeyChecking=no \
-                                ${SERVER_USER}@${SERVER_HOST} << 'ENDSSH'
-                            
-                            # Install Docker and Docker Compose if not present
-                            if ! command -v docker &> /dev/null; then
-                                echo "Installing Docker..."
-                                curl -fsSL https://get.docker.com -o get-docker.sh
-                                sh get-docker.sh
-                                systemctl start docker
-                                systemctl enable docker
-                            fi
-                            
-                            if ! command -v docker-compose &> /dev/null; then
-                                echo "Installing Docker Compose..."
-                                curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-                                chmod +x /usr/local/bin/docker-compose
-                            fi
-                            
-                            # Create deployment directory
-                            mkdir -p ${DEPLOY_PATH}
-                            cd ${DEPLOY_PATH}
-                            
-                            # Extract deployment package
-                            tar -xzf /tmp/deployment-${BUILD_NUMBER}.tar.gz
-                            
-                            # Make deploy script executable and run it
-                            chmod +x deploy.sh
-                            ./deploy.sh
-                            
-                            # Cleanup
-                            rm -f /tmp/deployment-${BUILD_NUMBER}.tar.gz
-                            
+                script {
+                    sh '''
+                        echo "Deploying to production server..."
+                        
+                        # Install sshpass if not available
+                        which sshpass || (apt-get update && apt-get install -y sshpass)
+                        
+                        # Copy deployment package to server
+                        sshpass -p "${SERVER_PASSWORD}" scp -o StrictHostKeyChecking=no \
+                            deployment-${BUILD_NUMBER}.tar.gz ${SERVER_USER}@${SERVER_HOST}:/tmp/
+                        
+                        # Execute deployment on server
+                        sshpass -p "${SERVER_PASSWORD}" ssh -o StrictHostKeyChecking=no \
+                            ${SERVER_USER}@${SERVER_HOST} << 'ENDSSH'
+                        
+                        # Install Docker and Docker Compose if not present
+                        if ! command -v docker &> /dev/null; then
+                            echo "Installing Docker..."
+                            curl -fsSL https://get.docker.com -o get-docker.sh
+                            sh get-docker.sh
+                            systemctl start docker
+                            systemctl enable docker
+                        fi
+                        
+                        if ! command -v docker-compose &> /dev/null; then
+                            echo "Installing Docker Compose..."
+                            curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+                            chmod +x /usr/local/bin/docker-compose
+                        fi
+                        
+                        # Create deployment directory
+                        mkdir -p ${DEPLOY_PATH}
+                        cd ${DEPLOY_PATH}
+                        
+                        # Extract deployment package
+                        tar -xzf /tmp/deployment-${BUILD_NUMBER}.tar.gz
+                        
+                        # Make deploy script executable and run it
+                        chmod +x deploy.sh
+                        ./deploy.sh
+                        
+                        # Cleanup
+                        rm -f /tmp/deployment-${BUILD_NUMBER}.tar.gz
+                        
 ENDSSH
-                        '''
-                    }
+                    '''
                 }
             }
         }
@@ -323,25 +330,21 @@ ENDSSH
             // Add failure notification steps here
             
             // Rollback on failure
-            withCredentials([
-                string(credentialsId: 'server-ssh-password', variable: 'SSH_PASSWORD')
-            ]) {
-                script {
-                    sh '''
-                        echo "Attempting rollback..."
-                        sshpass -p "${SSH_PASSWORD}" ssh -o StrictHostKeyChecking=no \
-                            ${SERVER_USER}@${SERVER_HOST} << 'ENDSSH'
-                        
-                        cd ${DEPLOY_PATH}
-                        # Restore previous version if backup exists
-                        if [ -f docker-compose.backup.yml ]; then
-                            echo "Rolling back to previous version..."
-                            mv docker-compose.backup.yml docker-compose.prod.yml
-                            docker-compose -f docker-compose.prod.yml up -d
-                        fi
+            script {
+                sh '''
+                    echo "Attempting rollback..."
+                    sshpass -p "${SERVER_PASSWORD}" ssh -o StrictHostKeyChecking=no \
+                        ${SERVER_USER}@${SERVER_HOST} << 'ENDSSH'
+                    
+                    cd ${DEPLOY_PATH}
+                    # Restore previous version if backup exists
+                    if [ -f docker-compose.backup.yml ]; then
+                        echo "Rolling back to previous version..."
+                        mv docker-compose.backup.yml docker-compose.prod.yml
+                        docker-compose -f docker-compose.prod.yml up -d
+                    fi
 ENDSSH
-                    '''
-                }
+                '''
             }
         }
     }
