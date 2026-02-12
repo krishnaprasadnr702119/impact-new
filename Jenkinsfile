@@ -1,16 +1,16 @@
 pipeline {
     agent any
     
-    // GitHub Repository Configuration
+    // Pipeline options
     options {
-        gitLabConnection('github')
         buildDiscarder(logRotator(numToKeepStr: '10'))
         timeout(time: 30, unit: 'MINUTES')
+        skipDefaultCheckout()
     }
     
     // Trigger on GitHub push (configure webhook in GitHub)
     triggers {
-        githubPush()
+        pollSCM('H/5 * * * *')  // Poll every 5 minutes as fallback
     }
     
     environment {
@@ -37,6 +37,8 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
+                // Clean workspace and checkout code
+                cleanWs()
                 checkout scm
                 script {
                     env.GIT_COMMIT_SHORT = sh(
