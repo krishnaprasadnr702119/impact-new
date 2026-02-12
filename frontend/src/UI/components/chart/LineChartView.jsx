@@ -1,0 +1,29 @@
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+
+const LineChartView = ({ data,title,xKey,yKey }) => {
+  return (
+    <div className="section">
+      <h3>{title}</h3>
+      <div className="chart-wrapper">
+        <ResponsiveContainer width="100%" height={300}>
+          <LineChart data={data}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
+            <XAxis dataKey={xKey} tick={{ fontSize: 12 }} />
+            <YAxis />
+            <Tooltip />
+            <Line 
+              type="monotone" 
+              dataKey={yKey}
+              stroke="#2c7be5" 
+              strokeWidth={3} 
+              dot={{ r: 4, stroke: "#2c7be5", fill: "#fff" }}
+              activeDot={{ r: 6 }}
+            />
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
+  );
+};
+
+export default LineChartView;

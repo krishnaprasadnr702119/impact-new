@@ -1,0 +1,104 @@
+version: '3.8'
+services:
+  db:
+    image: postgres:15
+    restart: always
+    environment:
+      POSTGRES_USER: ${DB_USER:-lmsuser}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-lmspassword}
+      POSTGRES_DB: ${DB_NAME:-lmsdb}
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    networks:
+      - lms-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-lmsuser} -d ${DB_NAME:-lmsdb}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: always
+    environment:
+      # Flask Configuration
+      - FLASK_ENV=production
+      - FLASK_DEBUG=0
+      - FLASK_SECRET_KEY=${FLASK_SECRET_KEY}
+      
+      # Database Configuration
+      - DATABASE_URL=postgresql://${DB_USER:-lmsuser}:${DB_PASSWORD:-lmspassword}@db:5432/${DB_NAME:-lmsdb}
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_USER=${DB_USER:-lmsuser}
+      - DB_PASSWORD=${DB_PASSWORD:-lmspassword}
+      - DB_NAME=${DB_NAME:-lmsdb}
+      
+      # JWT Configuration (REQUIRED for production)
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      - JWT_ACCESS_TOKEN_EXPIRES_HOURS=${JWT_ACCESS_TOKEN_EXPIRES_HOURS:-8}
+      - JWT_REFRESH_TOKEN_EXPIRES_DAYS=${JWT_REFRESH_TOKEN_EXPIRES_DAYS:-30}
+      
+      # API Configuration
+      - API_URL=${API_URL:-http://lms.inapp.com}
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://lms.inapp.com}
+      
+      # Admin Configuration
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin123}
+      - ADMIN_EMAIL=${ADMIN_EMAIL:-admin@example.com}
+      
+      # Email Configuration
+      - MAIL_SERVER=${MAIL_SERVER:-smtp.gmail.com}
+      - MAIL_PORT=${MAIL_PORT:-587}
+      - MAIL_USE_TLS=${MAIL_USE_TLS:-true}
+      - MAIL_USE_SSL=${MAIL_USE_SSL:-false}
+      - MAIL_USERNAME=${MAIL_USERNAME:-}
+      - MAIL_PASSWORD=${MAIL_PASSWORD:-}
+      - MAIL_DEFAULT_SENDER=${MAIL_DEFAULT_SENDER:-noreply@lms.com}
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./backend/uploads:/app/uploads
+    networks:
+      - lms-network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    restart: always
+    environment:
+      - NODE_ENV=production
+      - VITE_API_URL=${API_URL:-http://lms.inapp.com}
+    depends_on:
+      - backend
+    networks:
+      - lms-network
+
+  nginx:
+    image: nginx:alpine
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/conf:/etc/nginx/conf.d
+      - ./nginx/ssl:/etc/nginx/ssl
+    depends_on:
+      - backend
+      - frontend
+    networks:
+      - lms-network
+
+networks:
+  lms-network:
+    driver: bridge
+
+volumes:
+  db_data:
+    driver: local

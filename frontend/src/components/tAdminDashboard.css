@@ -1,0 +1,42 @@
+.dashboard-content {
+  padding: 2rem;
+  /* max-width: 1200px; */
+  margin: 0 auto;
+}
+
+.welcome-section {
+  background: linear-gradient(135deg, #1e293b, #334155);
+  border-radius: 1rem;
+  padding: 2rem;
+  margin-bottom: 2rem;
+  color: white;
+}
+
+.welcome-section h2 {
+  margin: 0;
+  font-size: 2rem;
+  font-weight: bold;
+  margin-bottom: 1rem;
+}
+
+.welcome-section p {
+  margin: 0;
+  font-size: 1.1rem;
+  opacity: 0.8;
+}
+
+.org-stats-section {
+  background: white;
+  border-radius: 1rem;
+  padding: 2rem;
+  margin-top: 2rem;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+.org-stats-section h2 {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: bold;
+  margin-bottom: 1.5rem;
+  color: #1e293b;
+}

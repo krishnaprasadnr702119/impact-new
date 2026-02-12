@@ -1,0 +1,100 @@
+version: "3.8"
+services:
+  db:
+    image: postgres:15
+    restart: always
+    environment:
+      POSTGRES_USER: lmsuser
+      POSTGRES_PASSWORD: lmspassword
+      POSTGRES_DB: lmsdb
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      # Database Configuration
+      DATABASE_URL: postgresql://lmsuser:lmspassword@db:5432/lmsdb
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USER: lmsuser
+      DB_PASSWORD: lmspassword
+      DB_NAME: lmsdb
+
+      # Flask Configuration
+      FLASK_ENV: development
+      FLASK_DEBUG: 1
+      FLASK_SECRET_KEY: dev-flask-secret-key-change-in-production
+
+      # JWT Configuration
+      JWT_SECRET_KEY: dev-jwt-secret-key-change-in-production-must-be-very-long-and-secure
+      JWT_ACCESS_TOKEN_EXPIRES_HOURS: 8
+      JWT_REFRESH_TOKEN_EXPIRES_DAYS: 30
+
+      # Email Configuration (optional for development)
+      MAIL_SERVER: smtp.gmail.com
+      MAIL_PORT: 587
+      MAIL_USE_TLS: "true"
+      MAIL_USE_SSL: "false"
+      MAIL_DEFAULT_SENDER: noreply@lms-dev.com
+
+      # CORS Configuration
+      CORS_ORIGINS: http://localhost:3001,http://127.0.0.1:3001,http://localhost:3000,http://127.0.0.1:3000
+
+      # API Configuration
+      API_URL: http://localhost:5001
+
+    depends_on:
+      - db
+    ports:
+      - "5001:5000"
+    volumes:
+      - ./backend:/app
+      - ./backend/uploads:/app/uploads
+    command: python app.py
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    environment:
+      VITE_API_URL: http://localhost
+    depends_on:
+      - backend
+    ports:
+      - "3001:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    command: npm run dev -- --host --port 3000
+
+  nginx:
+    image: nginx:alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/conf/default.conf:/etc/nginx/conf.d/default.conf
+    depends_on:
+      - frontend
+      - backend
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--quiet",
+          "--tries=1",
+          "--spider",
+          "http://localhost/api/health || exit 1",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+volumes:
+  db_data:

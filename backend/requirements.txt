@@ -1,0 +1,12 @@
+flask
+flask_sqlalchemy
+psycopg2-binary
+flask-cors
+PyJWT
+werkzeug
+python-dotenv
+bcrypt
+flask-bcrypt
+flask-mail
+sqlalchemy
+reportlab

@@ -1,0 +1,7 @@
+/* Import the fresh modern design */
+@import '../styles/fresh-design.css';
+
+.marketing-home {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  overflow-x: hidden;
+}
